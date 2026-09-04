@@ -201,7 +201,9 @@ Common causes:
 
 4. **Missing `.env` values** — confirm `POSTGRES_PASSWORD`, `SESSION_SECRET`,
    `ADMIN_API_KEY`, and `ADMIN_SESSION_SECRET` are set (no spaces or URL-unsafe
-   characters).
+   characters). Both session secrets must be **at least 32 characters** — the
+   placeholder values in `.env.example` are too short and will crash the apps.
+   Generate with `openssl rand -hex 24` (produces 48 hex chars).
 
 When local health checks pass, nginx should too:
 
