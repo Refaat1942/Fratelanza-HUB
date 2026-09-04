@@ -101,6 +101,13 @@ Postgres connection strings):
 openssl rand -hex 24   # run a few times, one per CHANGE_ME slot
 ```
 
+Validate before starting (checks lengths and CHANGE_ME placeholders):
+
+```bash
+chmod +x deploy/validate-env.sh
+./deploy/validate-env.sh .env
+```
+
 Then:
 
 ```bash
