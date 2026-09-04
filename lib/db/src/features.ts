@@ -52,7 +52,7 @@ export const GENERAL_FEATURE_KEYS: FeatureKey[] = FEATURE_KEYS.filter(
 
 export const FEATURE_LABELS: Record<FeatureKey, { en: string; ar: string }> = {
   tasks: { en: "Tasks", ar: "المهام" },
-  crm: { en: "CRM / Clients", ar: "إدارة العملاء" },
+  crm: { en: "Clients", ar: "العملاء" },
   finance: { en: "Finance", ar: "المالية" },
   team: { en: "Team / HR", ar: "الموظفين" },
   products: { en: "Products / Inventory", ar: "المنتجات" },

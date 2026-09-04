@@ -101,6 +101,13 @@ Postgres connection strings):
 openssl rand -hex 24   # run a few times, one per CHANGE_ME slot
 ```
 
+Validate before starting (checks lengths and CHANGE_ME placeholders):
+
+```bash
+chmod +x deploy/validate-env.sh
+./deploy/validate-env.sh .env
+```
+
 Then:
 
 ```bash
@@ -164,3 +171,139 @@ That's it for both apps. They share the same git checkout.
 | Renew SSL test | `sudo certbot renew --dry-run` |
 | Confirm ports are loopback | `ss -ltnp \| grep -E ':(1025\|2025)\b'` (should show `127.0.0.1`) |
 | Block a non-paying customer | admin UI → **Block** (CRM reflects within 60s) |
+
+## 11. Troubleshooting
+
+### `502 Bad Gateway` from nginx
+
+Nginx is up but the CRM container is not listening on `127.0.0.1:1025`.
+
+```bash
+cd ~/Fratelanza-HUB
+docker compose ps
+docker compose logs app --tail 80
+curl -v http://127.0.0.1:1025/api/healthz
+```
+
+Common causes:
+
+1. **App crash loop** — check `docker compose logs app`. Older images ran
+   `drizzle-kit push` on every boot, which fails without a TTY. Pull the
+   latest `main` and rebuild:
+   ```bash
+   git pull origin main
+   docker compose up -d --build
+   ```
+   If you still have a local `docker-compose.override.yml` that overrides
+   the app command, you can remove it after updating.
+
+2. **Wrong project directory** — the stack must run from `~/Fratelanza-HUB`,
+   not `/opt/fratelanza-crm` (that is a different Python project).
+
+3. **Port held by a stale container** — free loopback ports and restart:
+   ```bash
+   docker rm -f fratelanza-hub-app-1 fratelanza-hub-admin-app-1 2>/dev/null || true
+   docker compose up -d
+   ```
+
+4. **Missing `.env` values** — confirm `POSTGRES_PASSWORD`, `SESSION_SECRET`,
+   `ADMIN_API_KEY`, and `ADMIN_SESSION_SECRET` are set (no spaces or URL-unsafe
+   characters). Both session secrets must be **at least 32 characters** — the
+   placeholder values in `.env.example` are too short and will crash the apps.
+   Generate with `openssl rand -hex 24` (produces 48 hex chars).
+
+When local health checks pass, nginx should too:
+
+```bash
+curl -sf http://127.0.0.1:1025/api/healthz && echo " CRM OK"
+curl -sf http://127.0.0.1:1025/api/healthz -H "Host: hub.fratelanza.com" && echo " CRM tenant OK"
+curl -sf https://hub.fratelanza.com/api/healthz && echo " HTTPS OK"
+curl -sfI https://hub.fratelanza.com/api/healthz | head -1
+```
+
+If localhost works but HTTPS returns **502**, nginx is proxying to the wrong port
+or an old site config is still enabled:
+
+```bash
+sudo grep -R "proxy_pass" /etc/nginx/sites-enabled/
+sudo tail -30 /var/log/nginx/error.log
+
+cd ~/Fratelanza-HUB
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/fratelanza
+sudo ln -sf /etc/nginx/sites-available/fratelanza /etc/nginx/sites-enabled/fratelanza
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+CRM upstream must be `http://127.0.0.1:1025` and admin `http://127.0.0.1:2025`.
+
+Remove stale nginx sites that still proxy old subdomains (`pos`, `crm`, `console`):
+
+```bash
+sudo ls /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/pos /etc/nginx/sites-enabled/crm \
+  /etc/nginx/sites-enabled/fratelanza-console /etc/nginx/sites-enabled/pharmapos
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### `503` through a tenant subdomain (e.g. `hub.fratelanza.com`)
+
+Nginx is fine — the CRM cannot look up the tenant from the admin API.
+
+```bash
+# Must match the value in .env on both app and admin-app
+grep '^ADMIN_API_KEY=' .env
+
+# Test admin tenant API from inside the CRM container
+docker compose exec -T app node -e "
+fetch('http://admin-app:5050/api/tenants/hub', {
+  headers: { 'x-admin-api-key': process.env.ADMIN_API_KEY }
+}).then(async (r) => console.log(r.status, await r.text())).catch(console.error)
+"
+```
+
+- **404** → create customer `hub` at https://admin.fratelanza.com
+- **401** → `ADMIN_API_KEY` in `.env` does not match; set one value and
+  `docker compose up -d --force-recreate app admin-app`
+- **200** → tenant exists; retry the site
+
+### SSL certificate errors
+
+- `ERR_CERT_COMMON_NAME_INVALID` — another nginx site is serving the wrong
+  certificate. Disable unused sites under `/etc/nginx/sites-enabled/` and keep
+  only `fratelanza`.
+- `ERR_CERT_DATE_INVALID` — renew the wildcard cert:
+  `sudo certbot renew` (or rerun `deploy/setup-ssl.sh`).
+
+## 12. Hub only (no crm / pos / console subdomains)
+
+See **[deploy/HUB-ONLY.md](./HUB-ONLY.md)** for DNS, admin setup, and General + Medical features.
+
+Remove legacy CRM nginx sites and `/opt/fratelanza-crm` without stopping Hub:
+
+```bash
+cd ~/Fratelanza-HUB
+chmod +x deploy/cleanup-legacy-crm.sh
+./deploy/cleanup-legacy-crm.sh
+```
+
+## 13. Full teardown (clean slate before redeploy)
+
+Run on the VPS to stop hub/CRM, disable nginx, and optionally wipe data:
+
+```bash
+cd ~/Fratelanza-HUB
+chmod +x deploy/teardown.sh
+
+# Stop containers + disable nginx (keeps DB volumes and SSL certs)
+./deploy/teardown.sh
+
+# Also delete all tenant databases and uploads (cannot undo)
+./deploy/teardown.sh --purge
+
+# Purge + remove the git checkout entirely
+./deploy/teardown.sh --purge-all
+```
+
+This also stops the old Python stack in `/opt/fratelanza-crm` if present.
+DNS and Let's Encrypt certificates are left in place for an easier redeploy.
