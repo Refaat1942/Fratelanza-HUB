@@ -59,7 +59,7 @@ export default function Login() {
             {t("Manage your business with confidence", "أدر عملك بثقة واحترافية")}
           </h2>
           <p className="text-white/60 text-sm leading-relaxed">
-            {t("Tasks · CRM · Finance · Team · Products · Rentals", "المهام · العملاء · المالية · الفريق · المنتجات · الإيجارات")}
+            {t("Tasks · Clients · Finance · Team · Products · Rentals", "المهام · العملاء · المالية · الفريق · المنتجات · الإيجارات")}
           </p>
           <div className="flex gap-2 pt-2">
             {["Tasks", "Finance", "Reports", "Team"].map(tag => (
