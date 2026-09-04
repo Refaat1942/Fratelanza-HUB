@@ -275,7 +275,19 @@ fetch('http://admin-app:5050/api/tenants/hub', {
 - `ERR_CERT_DATE_INVALID` — renew the wildcard cert:
   `sudo certbot renew` (or rerun `deploy/setup-ssl.sh`).
 
-## 12. Full teardown (clean slate before redeploy)
+## 12. Hub only (no crm / pos / console subdomains)
+
+See **[deploy/HUB-ONLY.md](./HUB-ONLY.md)** for DNS, admin setup, and General + Medical features.
+
+Remove legacy CRM nginx sites and `/opt/fratelanza-crm` without stopping Hub:
+
+```bash
+cd ~/Fratelanza-HUB
+chmod +x deploy/cleanup-legacy-crm.sh
+./deploy/cleanup-legacy-crm.sh
+```
+
+## 13. Full teardown (clean slate before redeploy)
 
 Run on the VPS to stop hub/CRM, disable nginx, and optionally wipe data:
 
