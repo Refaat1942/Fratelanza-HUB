@@ -22,4 +22,6 @@ ENV STATIC_DIR=/app/artifacts/fratelanza-hub/dist/public
 
 EXPOSE 3000
 
-CMD ["/bin/sh", "-c", "pnpm --filter @workspace/db run push && node --enable-source-maps ./artifacts/api-server/dist/index.mjs"]
+RUN chmod +x scripts/docker-start.sh
+
+CMD ["/bin/sh", "scripts/docker-start.sh"]

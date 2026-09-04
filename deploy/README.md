@@ -164,3 +164,56 @@ That's it for both apps. They share the same git checkout.
 | Renew SSL test | `sudo certbot renew --dry-run` |
 | Confirm ports are loopback | `ss -ltnp \| grep -E ':(1025\|2025)\b'` (should show `127.0.0.1`) |
 | Block a non-paying customer | admin UI → **Block** (CRM reflects within 60s) |
+
+## 11. Troubleshooting
+
+### `502 Bad Gateway` from nginx
+
+Nginx is up but the CRM container is not listening on `127.0.0.1:1025`.
+
+```bash
+cd ~/Fratelanza-HUB
+docker compose ps
+docker compose logs app --tail 80
+curl -v http://127.0.0.1:1025/api/healthz
+```
+
+Common causes:
+
+1. **App crash loop** — check `docker compose logs app`. Older images ran
+   `drizzle-kit push` on every boot, which fails without a TTY. Pull the
+   latest `main` and rebuild:
+   ```bash
+   git pull origin main
+   docker compose up -d --build
+   ```
+   If you still have a local `docker-compose.override.yml` that overrides
+   the app command, you can remove it after updating.
+
+2. **Wrong project directory** — the stack must run from `~/Fratelanza-HUB`,
+   not `/opt/fratelanza-crm` (that is a different Python project).
+
+3. **Port held by a stale container** — free loopback ports and restart:
+   ```bash
+   docker rm -f fratelanza-hub-app-1 fratelanza-hub-admin-app-1 2>/dev/null || true
+   docker compose up -d
+   ```
+
+4. **Missing `.env` values** — confirm `POSTGRES_PASSWORD`, `SESSION_SECRET`,
+   `ADMIN_API_KEY`, and `ADMIN_SESSION_SECRET` are set (no spaces or URL-unsafe
+   characters).
+
+When local health checks pass, nginx should too:
+
+```bash
+curl -sf http://127.0.0.1:1025/api/healthz && echo " CRM OK"
+curl -sfI https://hub.fratelanza.com/api/healthz | head -1
+```
+
+### SSL certificate errors
+
+- `ERR_CERT_COMMON_NAME_INVALID` — another nginx site is serving the wrong
+  certificate. Disable unused sites under `/etc/nginx/sites-enabled/` and keep
+  only `fratelanza`.
+- `ERR_CERT_DATE_INVALID` — renew the wildcard cert:
+  `sudo certbot renew` (or rerun `deploy/setup-ssl.sh`).
