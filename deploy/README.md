@@ -274,3 +274,24 @@ fetch('http://admin-app:5050/api/tenants/hub', {
   only `fratelanza`.
 - `ERR_CERT_DATE_INVALID` — renew the wildcard cert:
   `sudo certbot renew` (or rerun `deploy/setup-ssl.sh`).
+
+## 12. Full teardown (clean slate before redeploy)
+
+Run on the VPS to stop hub/CRM, disable nginx, and optionally wipe data:
+
+```bash
+cd ~/Fratelanza-HUB
+chmod +x deploy/teardown.sh
+
+# Stop containers + disable nginx (keeps DB volumes and SSL certs)
+./deploy/teardown.sh
+
+# Also delete all tenant databases and uploads (cannot undo)
+./deploy/teardown.sh --purge
+
+# Purge + remove the git checkout entirely
+./deploy/teardown.sh --purge-all
+```
+
+This also stops the old Python stack in `/opt/fratelanza-crm` if present.
+DNS and Let's Encrypt certificates are left in place for an easier redeploy.
