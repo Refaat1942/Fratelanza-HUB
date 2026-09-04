@@ -216,8 +216,26 @@ When local health checks pass, nginx should too:
 
 ```bash
 curl -sf http://127.0.0.1:1025/api/healthz && echo " CRM OK"
+curl -sf http://127.0.0.1:1025/api/healthz -H "Host: hub.fratelanza.com" && echo " CRM tenant OK"
+curl -sf https://hub.fratelanza.com/api/healthz && echo " HTTPS OK"
 curl -sfI https://hub.fratelanza.com/api/healthz | head -1
 ```
+
+If localhost works but HTTPS returns **502**, nginx is proxying to the wrong port
+or an old site config is still enabled:
+
+```bash
+sudo grep -R "proxy_pass" /etc/nginx/sites-enabled/
+sudo tail -30 /var/log/nginx/error.log
+
+cd ~/Fratelanza-HUB
+sudo cp deploy/nginx.conf /etc/nginx/sites-available/fratelanza
+sudo ln -sf /etc/nginx/sites-available/fratelanza /etc/nginx/sites-enabled/fratelanza
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+CRM upstream must be `http://127.0.0.1:1025` and admin `http://127.0.0.1:2025`.
 
 ### SSL certificate errors
 
