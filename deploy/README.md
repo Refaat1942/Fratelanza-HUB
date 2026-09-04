@@ -237,6 +237,36 @@ sudo nginx -t && sudo systemctl reload nginx
 
 CRM upstream must be `http://127.0.0.1:1025` and admin `http://127.0.0.1:2025`.
 
+Remove stale nginx sites that still proxy old subdomains (`pos`, `crm`, `console`):
+
+```bash
+sudo ls /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/pos /etc/nginx/sites-enabled/crm \
+  /etc/nginx/sites-enabled/fratelanza-console /etc/nginx/sites-enabled/pharmapos
+sudo nginx -t && sudo systemctl reload nginx
+```
+
+### `503` through a tenant subdomain (e.g. `hub.fratelanza.com`)
+
+Nginx is fine — the CRM cannot look up the tenant from the admin API.
+
+```bash
+# Must match the value in .env on both app and admin-app
+grep '^ADMIN_API_KEY=' .env
+
+# Test admin tenant API from inside the CRM container
+docker compose exec -T app node -e "
+fetch('http://admin-app:5050/api/tenants/hub', {
+  headers: { 'x-admin-api-key': process.env.ADMIN_API_KEY }
+}).then(async (r) => console.log(r.status, await r.text())).catch(console.error)
+"
+```
+
+- **404** → create customer `hub` at https://admin.fratelanza.com
+- **401** → `ADMIN_API_KEY` in `.env` does not match; set one value and
+  `docker compose up -d --force-recreate app admin-app`
+- **200** → tenant exists; retry the site
+
 ### SSL certificate errors
 
 - `ERR_CERT_COMMON_NAME_INVALID` — another nginx site is serving the wrong

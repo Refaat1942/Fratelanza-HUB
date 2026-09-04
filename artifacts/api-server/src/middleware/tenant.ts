@@ -97,6 +97,12 @@ async function resolveTenant(subdomain: string): Promise<LookupResult> {
 }
 
 export function tenantMiddleware(req: Request, res: Response, next: NextFunction): void {
+  // Infra health checks must work even when a tenant is missing or admin is down.
+  if (req.path === "/healthz") {
+    next();
+    return;
+  }
+
   const headerOverride = ALLOW_TENANT_HEADER
     ? (req.header("x-tenant-subdomain") || "").toLowerCase().trim()
     : "";
