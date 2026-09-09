@@ -159,6 +159,7 @@ That's it for both apps. They share the same git checkout.
 
 | Want to… | Command |
 |---|---|
+| **Clean old Docker builds (safe)** | `./deploy/cleanup-old-builds.sh` then `--apply` |
 | See logs | `docker compose logs -f app` (or `admin-app`) |
 | Restart one service | `docker compose restart app` |
 | Renew SSL test | `sudo certbot renew --dry-run` |
